@@ -6,19 +6,18 @@ from random import randrange
 
 
 def print_board(show_players):
-    print("\t", end="")
-    print("[", end="")
+    print("\t[", end="")
     for item in range(1, 6):
         print("%2d, " % myBoard[item], end="")
     print("%2d]" % myBoard[6], end="")
+
     if show_players:
         print(" <- Player 1")
     else:
         print("")
 
-    print("\t[%2d]\t\t\t\t[%2d]" % (myBoard[0], myBoard[7]))
+    print("\t[%2d]\t\t\t\t[%2d]\n\t[" % (myBoard[0], myBoard[7]), end="")
 
-    print("\t[", end="")
     for item in range(8, 13):
         print("%2d, " % myBoard[item], end="")
     print("%2d]" % myBoard[13], end="")
@@ -32,10 +31,10 @@ def print_board(show_players):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
-    myBoard = [0]
+    myBoard = []
 
     # Make 14 fields, 0 and 7 will be player pots, we add 6 to all holes
-    for i in range(0, 13):
+    for i in range(0, 14):
         myBoard.append(6)
 
     # And change the pots to 0
@@ -56,7 +55,7 @@ if __name__ == '__main__':
         valid_move = False
         while not valid_move:
             if playerNum == 2:
-                playerIn = randrange(6)
+                playerIn = randrange(7)
             else:
                 playerIn = int(input("Player %i make a move: " % playerNum))
             if playerNum == 2:
@@ -111,6 +110,9 @@ if __name__ == '__main__':
             pl1sum += myBoard[i]
         for i in range(8, 14):
             pl2sum += myBoard[i]
+
+        print("Balls at pl1: %d and pl2: %d" % (pl1sum, pl2sum))
+
         if pl1sum == 0:
             print("Game over!")
             run = False
@@ -120,8 +122,6 @@ if __name__ == '__main__':
             run = False
             myBoard[7] += pl1sum
 
-        print("Balls at pl1: %d and pl2: %d" % (pl1sum, pl2sum))
-
         # if we end at a player pit it means the same player can go again so we don't change the playerNum
         if currentPos != 0 and currentPos != 7:
             if playerNum == 1:
@@ -129,7 +129,13 @@ if __name__ == '__main__':
             else:
                 playerNum = 1
 
-    print_board(True)
+    # Make the board pretty for printing it
+    for i in range(1, 7):
+        myBoard[i] = 0
+    for i in range(8, 14):
+        myBoard[i] = 0
+
+    print_board(False)
 
     if myBoard[0] > myBoard[7]:
         print("Player 1 wins with %d balls!\nPlayer 2 had %d balls!" % (myBoard[0], myBoard[7]))

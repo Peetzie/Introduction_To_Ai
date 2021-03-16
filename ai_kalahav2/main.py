@@ -15,6 +15,7 @@ class Board:
         self.player_turn = 1
         self.parent = None
         self.children = []
+        self.state_copy = None
         # Make 14 fields, 0 and 7 will be player pots, we add 6 to all holes
         for ii in range(0, 14):
             self.myBoard.append(4)
@@ -72,27 +73,30 @@ class Board:
             else:
                 self.player_turn = 1
 
+        pl1sum = 0
+        pl2sum = 0
+        for i in range(1, 7):
+            pl1sum += self.myBoard[i]
+        for i in range(8, 14):
+            pl2sum += self.myBoard[i]
+
+        if pl1sum == 0:
+            print("Game over!")
+            self.done = True
+            self.myBoard[0] += pl2sum
+        if pl2sum == 0:
+            print("Game over!")
+            self.done = True
+            self.myBoard[7] += pl1sum
+
         return self
 
-        # pl1sum = 0
-        # pl2sum = 0
-        # for i in range(1, 7):
-        #     pl1sum += self.myBoard[i]
-        # for i in range(8, 14):
-        #     pl2sum += self.myBoard[i]
-        #
-        # if pl1sum == 0:
-        #     print("Game over!")
-        #     self.done = True
-        #     run = False
-        #     self.myBoard[0] += pl2sum
-        # if pl2sum == 0:
-        #     print("Game over!")
-        #     self.done = True
-        #     run = False
-        #     self.myBoard[7] += pl1sum
-
-    def print_the_board(self, show_player_sides, show_turn):
+    def print_the_board(self, show_player_sides, show_turn, show_help):
+        if show_help:
+            print("\t ", end="")
+            for x in range(1, 7):
+                print("%2d  " % x, end="")
+            print("")
         print("\t[", end="")
         for item in range(1, 6):
             print("%2d, " % self.myBoard[item], end="")
@@ -113,17 +117,44 @@ class Board:
             print(" <- Player 2")
         else:
             print("")
+        if show_help:
+            print("\t ", end="")
+            for x in range(8, 14):
+                print("%2d  " % x, end="")
+            print("")
         if show_turn:
-            if self.player_turn == 1:
-                print("It's player 1's turn")
-            else:
-                print("It's player 2's turn")
+            print("\tPlayer turn: %d" % self.player_turn)
 
     def print_children(self):
         print("Printing children:")
         for x in self.children:
-            x.print_the_board(False, True)
-            print("")
+            if x is not None:
+                x.print_the_board(False, True, False)
+                print("")
+            else:
+                print("empty child, you failed somewhere")
+
+    # Add possible children, we have 6 possible moves per side so depending on the turn
+    def generate_children(self, depth):
+        if depth == 0:
+            print("Done with one branch:\t")
+            print("Parent: %s\t" % str(self.parent))
+            print("Self: %s\t" % str(self))
+            return self
+
+        # Make sure we only check valid moves for each player
+        for ii in range(1, 7):
+            if self.player_turn == 2:
+                ii += 7
+
+            if self.myBoard[ii] != 0:
+                self.state_copy = copy.deepcopy(self)
+                self.state_copy.parent = self
+                new_node = copy.deepcopy(self)
+                new_node.move_pot(ii)
+                new_node.print_the_board(False, True, False)
+                self.children.append(new_node)
+                new_node.generate_children(depth - 1)
 
 
 class AI:
@@ -132,20 +163,19 @@ class AI:
         self.depth = depth_in
         self.state = Board()
 
-    # Add possible children, we have 6 possible moves per side so depending on the turn
-    def find_children(self):
-        if self.state.player_turn == 1:
-            for ii in range(1, 7):
-                if self.state.myBoard[ii] != 0:
-                    state_copy = copy.deepcopy(self.state)
-                    self.state.children.append(state_copy.move_pot(ii))
+    def find_children(self, print_children, depth_in):
+        if depth_in <= 0:
+            self.state.generate_children(self.depth)
         else:
-            for ii in range(8, 14):
-                if self.state.myBoard[ii] != 0:
-                    state_copy = copy.deepcopy(self.state)
-                    self.state.children.append(state_copy.move_pot(ii))
+            self.state.generate_children(depth_in)
+        if print_children:
+            self.state.print_children()
 
-        self.state.print_children()
+    def best_move(self):
+        if self.state.player_turn == 2:
+            return randrange(8, 14)
+        else:
+            return randrange(1, 7)
 
     def util(self, state_in):
         my_side = 0
@@ -191,19 +221,26 @@ class AI:
 
 if __name__ == '__main__':
     the_board = Board()
-    the_AI = AI(3)
+    the_AI = None
+    against_ai = False
+    user_in = int(input("Gamemode:\n1. 1-Player vs. AI\n2. 2-Player\nChoose: "))
+    if user_in == 1:
+        the_AI = AI(5)
+        against_ai = True
+
     while not the_board.done:
-        the_board.print_the_board(True, False)
-        if the_board.player_turn == 1:
-            print("Player %d make a move!" % the_board.player_turn)
-            what_to_move = int(input("What pot do you want to move from? : "))
-            the_board.move_pot(what_to_move)
-        else:
-            print("Now AI:")
+        the_board.print_the_board(True, False, True)
+        what_to_move = 0
+        print("Player %d make a move!" % the_board.player_turn)
+        if against_ai and the_board.player_turn == 2:
+            print("AI doing things:")
             the_AI.state = copy.deepcopy(the_board)
-            the_AI.find_children()
-            break
-            # the_board.move_pot()
+            the_AI.find_children(True, 2)
+            what_to_move = the_AI.best_move()
+        else:
+            what_to_move = int(input("What pot do you want to move from? : "))
+
+        the_board.move_pot(what_to_move)
 
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

@@ -8,20 +8,21 @@ import copy
 
 class Board:
 
-    def __init__(self):
-        self.myBoard = []
+    def __init__(self, board_state, player_turn_in, parent_in):
+        self.myBoard = board_state
         self.currPos = 0
         self.done = False
-        self.player_turn = 1
-        self.parent = None
+        self.player_turn = player_turn_in
+        self.parent = parent_in
         self.children = []
         self.state_copy = None
         # Make 14 fields, 0 and 7 will be player pots, we add 6 to all holes
-        for ii in range(0, 14):
-            self.myBoard.append(4)
-        # And change the pots to 0
-        self.myBoard[0] = 0
-        self.myBoard[7] = 0
+        if len(board_state) == 0:
+            for ii in range(0, 14):
+                self.myBoard.append(4)
+            # And change the pots to 0
+            self.myBoard[0] = 0
+            self.myBoard[7] = 0
 
     def move_pot(self, pot):
         if pot < 1 or pot > 14 or pot == 7:
@@ -134,44 +135,55 @@ class Board:
             else:
                 print("empty child, you failed somewhere")
 
+    def print_first_child(self):
+        self.print_the_board(False, True, False)
+        if self.children[0] is not None:
+            self.children[0].print_first_child()
+
     # Add possible children, we have 6 possible moves per side so depending on the turn
-    def generate_children(self, depth):
+    def generate_children(self, depth, start_depth):
+        print("Depth: %d" % depth)
         if depth == 0:
-            print("Done with one branch:\t")
-            print("Parent: %s\t" % str(self.parent))
-            print("Self: %s\t" % str(self))
             return self
+
 
         # Make sure we only check valid moves for each player
         for ii in range(1, 7):
+            ii_copy = ii
             if self.player_turn == 2:
-                ii += 7
+                ii_copy += 7
 
-            if self.myBoard[ii] != 0:
-                self.state_copy = copy.deepcopy(self)
-                self.state_copy.parent = self
-                new_node = copy.deepcopy(self)
-                new_node.move_pot(ii)
+            if self.myBoard[ii_copy] != 0:
+                new_node = Board(copy.deepcopy(self.myBoard), self.player_turn, self)
+                print("Based on: %d\nNew_node: \t%s\nSelf: \t\t%s\nParent: \t%s" % (ii_copy, str(new_node), str(self), str(self.parent)))
                 new_node.print_the_board(False, True, False)
+                new_node.move_pot(ii_copy)
+                # self.print_the_board(False, True, False)
+                new_node.print_the_board(False, True, False)
+                new_node.generate_children(depth - 1, start_depth + 1)
                 self.children.append(new_node)
-                new_node.generate_children(depth - 1)
 
 
 class AI:
 
     def __init__(self, depth_in):
         self.depth = depth_in
-        self.state = Board()
+        self.state = Board([], 1, None)
+        self.head = None
 
     def find_children(self, print_children, depth_in):
         if depth_in <= 0:
-            self.state.generate_children(self.depth)
+            return self.state.generate_children(self.depth, 0)
         else:
-            self.state.generate_children(depth_in)
-        if print_children:
-            self.state.print_children()
+            return self.state.generate_children(depth_in, 0)
+
+    def print_head(self):
+        self.state.print_children()
+        print("Second child's children:")
+        self.state.children[1].print_children()
 
     def best_move(self):
+        print("Returning bullshit value!")
         if self.state.player_turn == 2:
             return randrange(8, 14)
         else:
@@ -220,27 +232,34 @@ class AI:
 
 
 if __name__ == '__main__':
-    the_board = Board()
+    the_board = Board([], 1, None)
     the_AI = None
     against_ai = False
-    user_in = int(input("Gamemode:\n1. 1-Player vs. AI\n2. 2-Player\nChoose: "))
+    user_in = int(input("Game_mode:\n1. 1-Player vs. AI\n2. 2-Player\nChoose: "))
     if user_in == 1:
         the_AI = AI(5)
         against_ai = True
 
-    while not the_board.done:
-        the_board.print_the_board(True, False, True)
-        what_to_move = 0
-        print("Player %d make a move!" % the_board.player_turn)
-        if against_ai and the_board.player_turn == 2:
-            print("AI doing things:")
-            the_AI.state = copy.deepcopy(the_board)
-            the_AI.find_children(True, 2)
-            what_to_move = the_AI.best_move()
-        else:
-            what_to_move = int(input("What pot do you want to move from? : "))
+    print("AI doing things:")
+    the_AI.state = copy.deepcopy(the_board)
+    the_AI.find_children(True, 2)
+    the_AI.print_head()
+    what_to_move = 0
+    # while not the_board.done:
+    #     the_board.print_the_board(True, False, True)
+    #     what_to_move = 0
+    #     print("Player %d make a move!" % the_board.player_turn)
+    #     if against_ai and the_board.player_turn == 2:
+    #         print("AI doing things:")
+    #         the_AI.state = copy.deepcopy(the_board)
+    #         last_node = the_AI.find_children(True, 2)
+    #         print("last_node: %s" % str(last_node))
+    #         # last_node.print_first_child()
+    #         what_to_move = the_AI.best_move()
+    #     else:
+    #         what_to_move = int(input("What pot do you want to move from? : "))
 
-        the_board.move_pot(what_to_move)
+    the_board.move_pot(what_to_move)
 
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

@@ -5,6 +5,38 @@
 from random import randrange
 
 
+class Node:
+    turn = 0
+    util_value = 0
+    children = []   # a list of children, here we add based on moves, which is up to 6 children
+    state = []
+
+    def __init__(self, util_value_in, turn_in):
+        self.util_value = util_value_in
+        self.turn = turn_in
+
+    # Add possible children, we have 6 possible moves per side so depending on the turn
+    def find_child(self):
+        if self.turn == 0:
+            for ii in range(1, 7):
+                if self.state[ii] != 0:
+                    self.children.append(self.move(i))
+        else:
+            for ii in range(8, 14):
+                if self.state[ii] != 0:
+                    self.children.append(self.move(i))
+
+    def util(self):
+        my_side = 0
+        other_side = 0
+        for ii in range(1, 7):
+            other_side += self.boardState[ii]
+        for ii in range(8, 14):
+            my_side += self.boardState[ii]
+
+        self.util_value = (self.boardState[7]-self.boardState[0]) + (self.turn-1) * 10 + (my_side-other_side)
+
+
 def print_board(show_players):
     print("\t[", end="")
     for item in range(1, 6):
@@ -16,7 +48,7 @@ def print_board(show_players):
     else:
         print("")
 
-    print("\t[%2d]\t\t\t\t[%2d]\n\t[" % (myBoard[0], myBoard[7]), end="")
+    print("\t[%2d]                [%2d]\n\t[" % (myBoard[0], myBoard[7]), end="")
 
     for item in range(8, 13):
         print("%2d, " % myBoard[item], end="")
@@ -33,9 +65,11 @@ if __name__ == '__main__':
 
     myBoard = []
 
+    test = Node(myBoard, 0)
+
     # Make 14 fields, 0 and 7 will be player pots, we add 6 to all holes
     for i in range(0, 14):
-        myBoard.append(6)
+        myBoard.append(4)
 
     # And change the pots to 0
     myBoard[0] = 0
@@ -51,10 +85,10 @@ if __name__ == '__main__':
     pl2sum = 0
     while run:
 
-        print_board(True)
+        print_board(False)
         valid_move = False
         while not valid_move:
-            if playerNum == 2:
+            if playerNum == 3:
                 playerIn = randrange(7)
             else:
                 playerIn = int(input("Player %i make a move: " % playerNum))

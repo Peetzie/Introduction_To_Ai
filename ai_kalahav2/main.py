@@ -16,6 +16,7 @@ class Board:
         self.parent = parent_in
         self.children = []
         self.state_copy = None
+        self.util = 0
         # Make 14 fields, 0 and 7 will be player pots, we add 6 to all holes
         if len(board_state) == 0:
             for ii in range(0, 14):
@@ -78,8 +79,7 @@ class Board:
         pl2sum = 0
         for i in range(1, 7):
             pl1sum += self.myBoard[i]
-        for i in range(8, 14):
-            pl2sum += self.myBoard[i]
+            pl2sum += self.myBoard[i+7]
 
         if pl1sum == 0:
             print("Game over!")
@@ -89,10 +89,14 @@ class Board:
             print("Game over!")
             self.done = True
             self.myBoard[7] += pl1sum
+        if self.done:
+            for i in range(1, 7):
+                self.myBoard[i] = 0
+                self.myBoard[i+7] = 0
 
         return self
 
-    def print_the_board(self, show_player_sides, show_turn, show_help):
+    def print_the_board(self, show_player_sides, show_turn, show_help, show_util_val):
         if show_help:
             print("\t ", end="")
             for x in range(1, 7):
@@ -125,27 +129,41 @@ class Board:
             print("")
         if show_turn:
             print("\tPlayer turn: %d" % self.player_turn)
+        if show_util_val:
+            print("\tUtil value: %f" % self.util)
 
     def print_children(self):
         print("Printing children:")
         for x in self.children:
             if x is not None:
-                x.print_the_board(False, True, False)
+                x.print_the_board(False, True, False, True)
                 print("")
             else:
                 print("empty child, you failed somewhere")
 
-    def print_first_child(self):
-        self.print_the_board(False, True, False)
-        if self.children[0] is not None:
-            self.children[0].print_first_child()
+
+    def find_util(self):
+        # Used to find the amount of balls on either side
+        my_side = 0
+        other_side = 0
+
+        # Count the balls
+        for ii in range(1, 7):
+            other_side += self.myBoard[ii]
+        for ii in range(8, 14):
+            my_side += self.myBoard[ii]
+
+        # Find the util/heuristric value
+        self.util = (self.myBoard[7]-self.myBoard[0]) + (self.player_turn-1) * 10 + (my_side-other_side)
 
     # Add possible children, we have 6 possible moves per side so depending on the turn
-    def generate_children(self, depth, start_depth):
-        print("Depth: %d" % depth)
+    def generate_children(self, depth, start_depth, print_info):
+        if print_info:
+            print("Depth: %d" % depth)
+
+        # If we are at the end we return
         if depth == 0:
             return self
-
 
         # Make sure we only check valid moves for each player
         for ii in range(1, 7):
@@ -154,13 +172,32 @@ class Board:
                 ii_copy += 7
 
             if self.myBoard[ii_copy] != 0:
+                # Create a new "node"/"board"
                 new_node = Board(copy.deepcopy(self.myBoard), self.player_turn, self)
-                print("Based on: %d\nNew_node: \t%s\nSelf: \t\t%s\nParent: \t%s" % (ii_copy, str(new_node), str(self), str(self.parent)))
-                new_node.print_the_board(False, True, False)
+                if print_info:
+                    print("Based on: %d\nNew_node: \t%s\nSelf: \t\t%s\nParent: \t%s" % (ii_copy, str(new_node), str(self), str(self.parent)))
+                    new_node.print_the_board(False, True, False, False)
+
+                # Move pieces in the new node based on ii
                 new_node.move_pot(ii_copy)
-                # self.print_the_board(False, True, False)
-                new_node.print_the_board(False, True, False)
-                new_node.generate_children(depth - 1, start_depth + 1)
+
+                # Assign a inf number based on the player turn
+                if new_node.player_turn == 2:
+                    new_node.util = float("inf")
+                else:
+                    new_node.util = float("-inf")
+                if print_info:
+                    new_node.print_the_board(False, True, False, False)
+
+
+                # Generate children for the new node if it's not a "goal state"
+                if not new_node.done:
+                    new_node.find_util()
+                    new_node.generate_children(depth - 1, start_depth + 1, print_info)
+                elif depth - 1 == 0:
+                    # If it's the last node we generate a util value
+                    new_node.find_util()
+                # After children are done we add the new_node to children list of it's parent
                 self.children.append(new_node)
 
 
@@ -171,16 +208,19 @@ class AI:
         self.state = Board([], 1, None)
         self.head = None
 
-    def find_children(self, print_children, depth_in):
+    def find_children(self, print_children, depth_in, board_in):
+        self.state = copy.deepcopy(board_in)
         if depth_in <= 0:
-            return self.state.generate_children(self.depth, 0)
+            return self.state.generate_children(self.depth, 0, print_children)
         else:
-            return self.state.generate_children(depth_in, 0)
+            return self.state.generate_children(depth_in, 0, print_children)
 
     def print_head(self):
         self.state.print_children()
         print("Second child's children:")
-        self.state.children[1].print_children()
+        self.state.children[2].print_children()
+        print("Third child's children:")
+        self.state.children[2].children[0].print_children()
 
     def best_move(self):
         print("Returning bullshit value!")
@@ -188,16 +228,6 @@ class AI:
             return randrange(8, 14)
         else:
             return randrange(1, 7)
-
-    def util(self, state_in):
-        my_side = 0
-        other_side = 0
-        for ii in range(1, 7):
-            other_side += state_in.myBoard[ii]
-        for ii in range(8, 14):
-            my_side += state_in.myBoard[ii]
-
-        self.util_value = (state_in.myBoard[7]-state_in.myBoard[0]) + (state_in.turn-1) * 10 + (my_side-other_side)
 
     def minimax(self, state_in, max_depth, is_max):
         # 1: find children, then find children from that layer and so on.. until we reach a certain depth
@@ -240,26 +270,23 @@ if __name__ == '__main__':
         the_AI = AI(5)
         against_ai = True
 
-    print("AI doing things:")
-    the_AI.state = copy.deepcopy(the_board)
-    the_AI.find_children(True, 2)
-    the_AI.print_head()
     what_to_move = 0
-    # while not the_board.done:
-    #     the_board.print_the_board(True, False, True)
-    #     what_to_move = 0
-    #     print("Player %d make a move!" % the_board.player_turn)
-    #     if against_ai and the_board.player_turn == 2:
-    #         print("AI doing things:")
-    #         the_AI.state = copy.deepcopy(the_board)
-    #         last_node = the_AI.find_children(True, 2)
-    #         print("last_node: %s" % str(last_node))
-    #         # last_node.print_first_child()
-    #         what_to_move = the_AI.best_move()
-    #     else:
-    #         what_to_move = int(input("What pot do you want to move from? : "))
+    while not the_board.done:
+        the_board.print_the_board(True, False, True, False)
+        what_to_move = 0
+        print("Player %d make a move!" % the_board.player_turn)
+        if against_ai and the_board.player_turn == 2:
+            print("AI doing things:")
 
-    the_board.move_pot(what_to_move)
+            last_node = the_AI.find_children(False, 3, the_board)
+            print("last_node: %s" % str(last_node))
+            # last_node.print_first_child()
+            what_to_move = the_AI.best_move()
+        else:
+            what_to_move = int(input("What pot do you want to move from? : "))
+        print("Moving from pot: %d!" % what_to_move)
+        the_board.move_pot(what_to_move)
+    the_board.print_the_board(True, False, False, False)
 
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

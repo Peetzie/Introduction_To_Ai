@@ -2,11 +2,11 @@
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
+import copy
 
 class Node:
     total_nodes = 0
-    def __init__(self, value_in=None, turn_in = 1):
+    def __init__(self, value_in=0, turn_in = 1):
         self.value = value_in       # value of current node
         self.boardState = []        # board for this node
         self.children = []      # list of children
@@ -15,6 +15,7 @@ class Node:
         self.last_move = -1
         self.util = -999999
         self.best_node = None
+        self.done = False
         Node.total_nodes += 1
 
 
@@ -84,6 +85,7 @@ def print_state(self, indent, print_indexes, print_turn = False, print_util = Fa
         print(indent + " ",end="")
         for i in range(0, 6):
             print("%2d " % i, end="")
+        print("")
     print("Last move: %d" % self.last_move, end="")
     if print_turn:
         print(" Turn: %d " % self.turn, end= "")
@@ -118,31 +120,40 @@ def create_children(self, depth):
         # becomes a problem, also we should do it in the minimax algorithm
         return
 
+    # If this node is done, we wont create any children or anything
+    if self.done:
+        return
+
+    possible_moves = 0
     if self.turn == 1:
         for space in range(0, 6):
             if self.boardState[space] != 0:
+                possible_moves += 1
                 new_node = insert_at_node(self, self.value+1)
                 move_balls(new_node, space)
                 create_children(new_node, depth-1)
     else:
         for space in range(7, 13):
             if self.boardState[space] != 0:
+                possible_moves += 1
                 new_node = insert_at_node(self, self.value+1)
                 move_balls(new_node, space)
                 create_children(new_node, depth-1)
+    if possible_moves == 0:
+        print("Game Over!")
 
 # Moves balls from a given move_from position, will play out the events until it lands in an empty pit or in the pot
 def move_balls(node_in, move_from):
     # Handle simple errors
     if move_from < 0 or move_from > 13:
         print("Error, selected value is out of bounds!")
-        return 1
+        return -1
     if node_in.boardState[move_from] == 0:
         print("Error you tried to move from empty pot")
-        return 1
+        return -1
     if node_in.boardState[6] + node_in.boardState[13] == total_ball_count*12:
         print("Error, no balls left to move")
-        return 1
+        return -1
 
     # Update the last move
     node_in.last_move = move_from
@@ -177,12 +188,36 @@ def move_balls(node_in, move_from):
         if hand == 0 and node_in.boardState[currpos] > 1 and not (currpos == 6 or currpos == 13):
             hand = node_in.boardState[currpos]
             node_in.boardState[currpos] = 0
+    pl1_side= 0
+    pl2_side= 0
+    for i in range(0, 6):
+        pl1_side += node_in.boardState[i]
+    for i in range(7, 13):
+        pl2_side += node_in.boardState[i]
+
+    # Player 1 won
+    if pl1_side == 0:
+        node_in.done = True
+        # Add balls from opponent side to pit
+        node_in.boardState[6] += pl2_side
+        # Remove the balls from opponent side
+        for i in range(7, 13):
+            node_in.boardState[i] = 0
+
+    # Player 2 won
+    if pl2_side == 0:
+        node_in.done = True
+        # Add balls from opponent side to pit
+        node_in.boardState[13] += pl1_side
+        for i in range(0, 6):
+            node_in.boardState[i] = 0
 
     # If we end in our own store don't update
     if not(currpos == 6 or currpos == 13):
         node_in.turn += 1
         if node_in.turn > 2:
             node_in.turn = 1
+    return node_in.turn
 
 # Minimax, finds the best util value
 # should maximize the value when the turn is 2
@@ -190,6 +225,11 @@ def move_balls(node_in, move_from):
 def minimax(node_in, depth):
     # print("In minimax, depth = %d" % depth)
     if depth == 0:
+        return calc_util(node_in)
+
+    # If the node we visit is a done node, we return this node
+    if node_in.done:
+        node_in.best_node = node_in
         return calc_util(node_in)
 
     # If turn = 2 for the node we maximize
@@ -223,6 +263,8 @@ def minimax(node_in, depth):
     # print("Best fit: %d" % best_fit)
     return best_fit
 
+
+
 # Function traverses from the best node and up, then it returns the last nodes' move
 def what_move(node_in):
     trav = node_in.best_node
@@ -233,6 +275,13 @@ def what_move(node_in):
 
     return best_move
 
+
+def check_if_done(node_in):
+    if node_in.done:
+        return node_in.turn
+    else:
+        return -1
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     total_ball_count = int(input("How many balls do you want to have in each pit? (4-6): "))
@@ -242,13 +291,6 @@ if __name__ == '__main__':
     if total_ball_count < 4:
         total_ball_count = 4
 
-    the_board = Node()              # Create a kalaha board
-    setup_start_board(the_board.boardState, total_ball_count)    # Make setup the board
-
-    the_ai = CoolTree()
-    the_ai.insert_node(1, total_ball_count)
-    the_ai.head.turn = 2
-
     ai_depth = int(input("How deep should the AI search? (max 9): "))
     # Limit input
     if ai_depth > 9:
@@ -256,20 +298,48 @@ if __name__ == '__main__':
     if ai_depth < 0:
         ai_depth = 1
 
-    print("Finding best move for player 2, from this state:")
-    print_state(the_ai.head, "", False)
+    the_ai = CoolTree()                                             # Create agent
+    board_node = Node()                                              # Create a kalaha board
+    setup_start_board(board_node.boardState, total_ball_count)       # Make setup the board
+    board_node.turn = 2
 
-    create_children(the_ai.head, ai_depth)
+    game_done = -1
+    while game_done == -1:
+        while board_node.turn == 1:
+            print("Player 1!")
+            print_state(board_node, "", True, False, False)  # Print the board
+            move_from_this = int(input("What pit do you want to move from?:"))
+            move_balls(board_node, move_from_this)
+        while board_node.turn == 2:
+            print("Player 2/AI!")
+            print_state(board_node, "", True, False, False)  # Print the board
+            print("What pit do you want to move from?:")
+            the_ai.head = copy.deepcopy(board_node)
 
-    # my_list.call_child_print(0)
+            # Generate the tree we search in
+            create_children(the_ai.head, ai_depth)
 
-    print("Best util value: %d" % minimax(the_ai.head, ai_depth))
+            # Call the minimax, values found in the algorithm is stored in the nodes themselves
+            minimax(the_ai.head, ai_depth)
 
-    print_state(the_ai.head.best_node, "", True, True, True)
+            # Uncomment this to see the path the AI finds
+            # print_parents(the_ai.head.best_node)
 
-    print_parents(the_ai.head.best_node)
+            # Find the move, based on what was found in the minimax
+            move_this = what_move(the_ai.head)
+            print("The best move that was found: %d" % move_this)
 
-    print("What to move: %d" % what_move(the_ai.head))
+            # Actually move it
+            move_balls(board_node, move_this)
 
-    print("Total nodes: %d" % Node.total_nodes)
+            # Check if the game is over
+            game_done = check_if_done(board_node)
+            if game_done != -1:
+                break
+
+            # Print how many nodes are created
+            print("Total nodes: %d" % Node.total_nodes)
+
+    print("Player %d won!" % game_done)
+    print_state(board_node, "", False, False, False)
 
